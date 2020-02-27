@@ -1,2 +1,2 @@
-# kali-dojo-back
-备份kali.org/dojo/
+# kali-dojo-bac
+kali live build
