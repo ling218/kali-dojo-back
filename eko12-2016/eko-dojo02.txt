@@ -1,0 +1,81 @@
+# Download a Kali ISO or use the one you generated earlier
+wget http://archive.kali.org/kali-full.iso
+
+# Check that you have the USB drive recognised properly
+root@kali:~# fdisk -l
+Disk /dev/sda: 20 GiB, 21474836480 bytes, 41943040 sectors
+
+...SNIP...
+
+Disk /dev/sdb: 31.6 GiB, 32505856000 bytes, 63488000 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: gpt
+Disk identifier: B07D7F22-FE77-4222-BA22-BDAADA1C7B22
+
+Device      Start      End  Sectors  Size Type
+/dev/sdb1      40   409639   409600  200M EFI System
+/dev/sdb2  411648 63485951 63074304 30.1G Microsoft basic data
+root@kali:~#
+
+# Image the Kali ISO onto the USB
+# DANGER DANGER DANGER DANGER DANGER DANGER!
+dd if=kali-full.iso of=/dev/sdb bs=1M
+
+# Make sure the USB is unmounted after the dd
+root@kali:~# umount /dev/sdb1
+root@kali:~# umount /dev/sdb2
+
+# Create two additional partitions for persistence
+root@kali:~# parted /dev/sdb
+GNU Parted 3.2
+Using /dev/sdb
+Welcome to GNU Parted! Type 'help' to view a list of commands.
+(parted) print
+Model: SanDisk SanDisk Ultra (scsi)
+Disk /dev/sdb: 31.6GB
+Sector size (logical/physical): 512B/512B
+Partition Table: msdos
+Disk Flags:
+
+Number  Start   End    Size    Type     File system  Flags
+ 1      32.8kB  795MB  795MB   primary               boot, hidden
+ 2      795MB   872MB  76.7MB  primary  fat16
+
+(parted) mkpart primary 873 5000
+(parted) mkpart primary 5000 100%
+(parted) q
+Information: You may need to update /etc/fstab.
+root@kali:~#
+
+# Format the unencrypted persistence partition & label it
+mkfs.ext3 /dev/sdb3
+e2label /dev/sdb3 persistence
+
+# Mount and generate a persistence configuration file
+mkdir -p /mnt/usb
+mount /dev/sdb3 /mnt/usb
+echo "/ union" > /mnt/usb/persistence.conf
+umount /mnt/usb
+
+# Now create and format the encrypted persistence partition
+cryptsetup --verbose --verify-passphrase luksFormat /dev/sdb4
+cryptsetup luksOpen /dev/sdb4 my_usb
+
+# Format the encrypted persistence partition
+mkfs.ext3 /dev/mapper/my_usb
+e2label /dev/mapper/my_usb persistence
+
+# (Optional) Check to see your partition layout
+ls -l /dev/disk/by-label
+
+# Mount and create a persistence configuration file on the encrypted partition
+mkdir -p /mnt/my_usb
+mount /dev/mapper/my_usb /mnt/my_usb
+echo "/ union" > /mnt/my_usb/persistence.conf
+umount /dev/mapper/my_usb
+cryptsetup luksClose /dev/mapper/my_usb
+
+# If you want to add a Nuke password option!
+cryptsetup luksAddNuke /dev/sdb4

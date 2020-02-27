@@ -1,0 +1,63 @@
+# Update your system!
+apt-get update
+apt-get dist-upgrade
+
+# Install needed tools
+apt install -y git live-build cdebootstrap curl
+
+# Clone Kali live build config files
+git clone git://git.kali.org/live-build-config.git
+
+# Overwrite default package lists with minimal needed packages
+cd live-build-config/
+cat kali-config/variant-default/package-lists/kali.list.chroot
+echo cryptsetup > kali-config/variant-default/package-lists/kali.list.chroot
+echo openssh-server >> kali-config/variant-default/package-lists/kali.list.chroot
+echo nmap >> kali-config/variant-default/package-lists/kali.list.chroot
+
+# Configure custom startup script
+mkdir -p kali-config/common/includes.chroot/lib/systemd/system/
+
+cat << EOF > kali-config/common/includes.chroot/lib/systemd/system/angela.service
+[Unit]
+Description=Start Custom Script
+After=multi-user.target
+
+[Service]
+Type=idle
+ExecStart=/bin/bash /usr/bin/startssh
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Create custom startup script
+mkdir -p kali-config/common/includes.chroot/usr/bin/
+
+cat << EOF > kali-config/common/includes.chroot/usr/bin/startssh
+#!/bin/sh
+echo hola > /root/test.txt
+EOF
+
+# Create live hook to enable custom service
+cat << EOF > kali-config/common/hooks/live/angela.chroot
+#!/bin/sh
+systemctl enable angela.service || true
+EOF
+
+chmod 644 kali-config/common/hooks/live/angela.chroot
+
+# Create boot config file
+cat << EOF > kali-config/common/includes.binary/isolinux/install.cfg
+label install
+menu label ^Unattended Install
+linux /install/vmlinuz
+initrd /install/initrd.gz
+append vga=788 -- quiet file=/cdrom/install/preseed.cfg locale=en_US keymap=us hostname=kali domain=local.lan
+EOF
+
+# Download preseed file and place in correct place
+wget https://kali.org/dojo/preseed.cfg -O ./kali-config/common/includes.installer/preseed.cfg
+
+# Build the ISO!
+./build.sh --distribution kali-rolling --verbose
