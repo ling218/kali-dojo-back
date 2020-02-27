@@ -1,0 +1,54 @@
+wget http://archive.kali.org/sana.iso
+dd if=sana.iso  of=/dev/sdb bs=1M
+
+
+root@kali:~# parted /dev/sdb  
+GNU Parted 3.2
+Using /dev/sdb
+Welcome to GNU Parted! Type 'help' to view a list of commands.
+(parted) print                                                            
+Model: SanDisk SanDisk Ultra (scsi)
+Disk /dev/sdb: 31.6GB
+Sector size (logical/physical): 512B/512B
+Partition Table: msdos
+Disk Flags: 
+
+Number  Start   End    Size    Type     File system  Flags
+ 1      32.8kB  795MB  795MB   primary               boot, hidden
+ 2      795MB   872MB  76.7MB  primary  fat16
+
+(parted) mkpart primary 901 5000                                          
+(parted) mkpart primary 5000 100%
+(parted) q                                                                
+Information: You may need to update /etc/fstab.
+
+fdisk -l /dev/sdb
+
+mkfs.ext3 /dev/sdb3
+e2label /dev/sdb3 persistence
+
+mkdir -p /mnt/usb
+mount /dev/sdb3 /mnt/usb
+echo "/ union" > /mnt/usb/persistence.conf
+umount /mnt/usb
+
+########################
+
+cryptsetup --verbose --verify-passphrase luksFormat /dev/sdb4
+cryptsetup luksOpen /dev/sdb4 my_usb
+
+mkfs.ext3 /dev/mapper/my_usb
+e2label /dev/mapper/my_usb persistence
+
+ls -l /dev/disk/by-label
+
+mkdir -p /mnt/my_usb
+mount /dev/mapper/my_usb /mnt/my_usb
+echo "/ union" > /mnt/my_usb/persistence.conf
+umount /dev/mapper/my_usb
+cryptsetup luksClose /dev/mapper/my_usb
+
+root@kali:~# cryptsetup luksAddNuke /dev/sdb4
+Enter any existing passphrase: 
+Enter new passphrase for key slot:
+

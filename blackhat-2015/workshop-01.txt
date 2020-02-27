@@ -1,0 +1,56 @@
+# Workshop 01 - Rolling your own Kali 2.0 ISOs
+
+##################################################################
+# 1. Git clone the live-build configs
+##################################################################
+
+apt-get update
+apt-get install git live-build cdebootstrap curl -y
+git clone git://git.kali.org/live-build-config.git
+cd live-build-config
+
+##################################################################
+# 2. Edit the tools list, add cryptsetup, gparted, asap.
+##################################################################
+echo cryptsetup >> kali-config/variant-light/package-lists/kali.list.chroot
+echo gparted >> kali-config/variant-light/package-lists/kali.list.chroot
+echo amap >> kali-config/variant-light/package-lists/kali.list.chroot
+
+##################################################################
+# 3. Create a chroot hook which enables boot time starting of the SSHD service
+##################################################################
+echo 'update-rc.d -f ssh enable' >>  kali-config/common/hooks/01-start-ssh.chroot
+chmod +x kali-config/common/hooks/01-start-ssh.chroot
+
+##################################################################
+# 4. Create a binary hook which adds a new boot menu option for Unattended Install
+##################################################################
+wget https://www.kali.org/dojo/unattended.txt -O kali-config/common/hooks/02-unattended-boot.binary
+chmod +x kali-config/common/hooks/02-unattended-boot.binary
+
+ls -l kali-config/common/hooks/
+
+##################################################################
+# 5. Overlay a new wallpaper in includes.chroot
+##################################################################
+mkdir -p kali-config/common/includes.chroot/usr/share/images/desktop-base/
+wget https://www.kali.org/dojo/wp-blue.png -O kali-config/common/includes.chroot/usr/share/images/desktop-base/kali-wallpaper_1920x1080.png
+
+##################################################################
+# 5. Add our public SSH key to the authorized key list.
+##################################################################
+ssh-keygen 
+mkdir -p kali-config/common/includes.chroot/root/.ssh/
+cp /root/.ssh/id_rsa.pub kali-config/common/includes.chroot/root/.ssh/authorized_keys
+
+##################################################################
+# 6. Set up an unattended preseed file
+##################################################################
+wget https://www.kali.org/dojo/preseed.cfg -O ./kali-config/common/includes.installer/preseed.cfg
+
+##################################################################
+
+##################################################################
+# 8. Build the ISO
+##################################################################
+./build.sh --variant light --distribution sana --verbose
